@@ -4,57 +4,68 @@ import java.util.*
 import kotlin.random.Random
 
 data class Dim2(val x: Int, val y: Int)
+
 enum class CellState {
     UNEXPLORED, EXPLORED, MARKED
 }
+
 class Cell(val mine: Boolean, val neighbors: Int, var cellState: CellState) {
-    fun getNotation(reveal: Boolean = false) = when(cellState) {
-            CellState.UNEXPLORED -> if (mine && reveal) "X" else "."
-            CellState.MARKED -> if (mine && reveal) "X" else "*"
-            CellState.EXPLORED -> if (neighbors == 0) "/" else neighbors.toString()
-        }
+    fun getNotation(reveal: Boolean = false) = when (cellState) {
+        CellState.UNEXPLORED -> if (mine && reveal) "X" else "."
+        CellState.MARKED -> if (mine && reveal) "X" else "*"
+        CellState.EXPLORED -> if (neighbors == 0) "/" else neighbors.toString()
+    }
 }
 
-val neighborIncrs = listOf(Dim2(-1, -1), Dim2(-1, 0), Dim2(-1, 1),
+val neighborIncrements = listOf(
+    Dim2(-1, -1), Dim2(-1, 0), Dim2(-1, 1),
     Dim2(0, -1), Dim2(0, 1),
-    Dim2(1, -1), Dim2(1, 0), Dim2(1, 1))
+    Dim2(1, -1), Dim2(1, 0), Dim2(1, 1)
+)
 
 fun getNeighbors(size: Dim2, loc: Dim2): List<Dim2> =
-    neighborIncrs.map { (xincr, yincr) ->
-        Dim2(loc.x + xincr, loc.y + yincr)
-    } .filter { (i,j) ->
+    neighborIncrements.map { (xIncr, yIncr) ->
+        Dim2(loc.x + xIncr, loc.y + yIncr)
+    }.filter { (i, j) ->
         i >= 0 && i < size.x && j >= 0 && j < size.y
     }
-fun countNeighbors(mineLocations: List<Dim2>, size: Dim2, loc: Dim2):Int {
+
+fun countNeighbors(mineLocations: Set<Dim2>, size: Dim2, loc: Dim2): Int {
     if (mineLocations.contains(loc)) return 0
     return getNeighbors(size, loc).count { mineLocations.contains(it) }
 }
 
-fun setup(size: Dim2, mineLocations: List<Dim2>) = Array(size.x) { row ->
-        Array(size.y) { col -> Cell(
+fun setup(size: Dim2, mineLocations: Set<Dim2>) = Array(size.x) { row ->
+    Array(size.y) { col ->
+        Cell(
             mineLocations.contains(Dim2(row, col)),
             countNeighbors(mineLocations, size, Dim2(row, col)),
-            CellState.UNEXPLORED)
-        }
+            CellState.UNEXPLORED
+        )
     }
-
-fun generateMineLocations(size: Dim2, numMines: Int) = List(numMines) {
-    val i = Random.nextInt(0, size.x)
-    val j = Random.nextInt(0, size.y)
-    Dim2(i, j)
 }
 
-fun display(board: Array<Array<Cell>>, reveal:Boolean = false) {
-    println(" |" + (1..9).joinToString(separator = " ") + " |")
-    println("-|" + "--".repeat(9) + "|")
+fun generateMineLocations(size: Dim2, numMines: Int): Set<Dim2> {
+    val mineLocations = mutableSetOf<Dim2>()
+    while (mineLocations.size < numMines) {
+        val i = Random.nextInt(0, size.x)
+        val j = Random.nextInt(0, size.y)
+        mineLocations.add(Dim2(i, j))
+    }
+    return mineLocations
+}
+
+fun display(board: Array<Array<Cell>>, reveal: Boolean = false) {
+    println(" |" + (1..board[0].size).joinToString(separator = " ") + " |")
+    println("-|" + "--".repeat(board[0].size) + "|")
     for (i in board.indices) {
-        println("${i+1}|" + board[i].joinToString(" ") { it.getNotation(reveal)} + " |")
+        println("${i + 1}|" + board[i].joinToString(" ") { it.getNotation(reveal) } + " |")
     }
-    println("-|" + "--".repeat(9) + "|")
-    println(" |" + "  ".repeat(9) + "|")
+    println("-|" + "--".repeat(board[0].size) + "|")
+    println(" |" + "  ".repeat(board[0].size) + "|")
 }
 
-fun hasWon(board: Array<Array<Cell>>):Boolean {
+fun hasWon(board: Array<Array<Cell>>): Boolean {
     val size = Dim2(board.size, board[0].size)
     val numMines = board.sumOf { row -> row.count { it.mine } }
     val explored = board.sumOf { row -> row.count { it.cellState == CellState.EXPLORED } }
@@ -67,27 +78,28 @@ fun hasWon(board: Array<Array<Cell>>):Boolean {
     return numMines == markedIsMine && markedIsNotMine == 0
 }
 
-fun markCell(board: Array<Array<Cell>>, loc: Dim2) =
+fun markCell(board: Array<Array<Cell>>, loc: Dim2): Boolean {
     if (board[loc.x][loc.y].cellState == CellState.EXPLORED) {
         println("Cell is already explored")
-        false
-    } else {
-        board[loc.x][loc.y].cellState = if (board[loc.x][loc.y].cellState == CellState.MARKED)
-            CellState.UNEXPLORED else CellState.MARKED
-        true
+        return false
     }
+    board[loc.x][loc.y].cellState = if (board[loc.x][loc.y].cellState == CellState.MARKED)
+        CellState.UNEXPLORED else CellState.MARKED
+    return true
+}
 
-fun exploreCell(board: Array<Array<Cell>>, loc: Dim2): Boolean =
+fun exploreCell(board: Array<Array<Cell>>, loc: Dim2): Boolean {
     if (board[loc.x][loc.y].cellState == CellState.EXPLORED) {
-        false
-    } else {
-        board[loc.x][loc.y].cellState = CellState.EXPLORED
-        if (board[loc.x][loc.y].neighbors == 0) {
-            val size = Dim2(board.size, board[0].size)
-            getNeighbors(size, loc).forEach { exploreCell(board, it) }
-        }
-        true
+        return false
     }
+    board[loc.x][loc.y].cellState = CellState.EXPLORED
+    if (board[loc.x][loc.y].neighbors == 0) {
+        val size = Dim2(board.size, board[0].size)
+        getNeighbors(size, loc).forEach { exploreCell(board, it) }
+    }
+    return true
+}
+
 fun main() {
     val scanner = Scanner(System.`in`)
     val size = Dim2(9, 9)
@@ -97,7 +109,7 @@ fun main() {
     val mineLocations = generateMineLocations(size, numMines)
 
     val board = setup(size, mineLocations)
-    var endGame:Boolean
+    var endGame: Boolean
     do {
         display(board)
         var didToggle: Boolean
@@ -106,10 +118,10 @@ fun main() {
             println("Set/unset mines marks or claim a cell as free:")
             val x = scanner.nextInt() - 1
             val y = scanner.nextInt() - 1
-            val loc = Dim2(x,y)
+            val loc = Dim2(x, y)
 
             val command = scanner.next()
-            didToggle = when(command) {
+            didToggle = when (command) {
                 "mine" -> markCell(board, loc)
                 "free" -> {
                     if (board[loc.x][loc.y].mine) {
@@ -119,13 +131,13 @@ fun main() {
                     exploreCell(board, loc)
                 }
                 else -> {
-                    println("Invalid Command $command");
+                    println("Invalid Command $command")
                     false
                 }
             }
-        } while(!didToggle)
+        } while (!didToggle)
         endGame = lost || hasWon(board)
-    } while(!endGame)
+    } while (!endGame)
     display(board, true)
     if (hasWon(board)) {
         println("Congratulations! You found all the mines!")
